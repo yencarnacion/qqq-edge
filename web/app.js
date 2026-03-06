@@ -605,6 +605,20 @@ function normalizeHHMM(raw) {
   if (h < 0 || h > 23 || m < 0 || m > 59) return "";
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+function isTypingTarget(target) {
+  const el = target instanceof Element ? target : null;
+  if (!el) return false;
+  const tag = (el.tagName || "").toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON") return true;
+  if (el.isContentEditable) return true;
+  return !!el.closest("input, textarea, select, button, [contenteditable='true']");
+}
+function triggerNowShortcut() {
+  const btn = document.getElementById("btnLiveNow") || document.querySelector(".localPreset[data-time='now']");
+  if (btn && typeof btn.click === "function") {
+    btn.click();
+  }
+}
 function nowHHMMET() {
   try {
     const fmt = new Intl.DateTimeFormat("en-GB", {
@@ -1931,6 +1945,13 @@ function initEssentials(){
   window.addEventListener('pointerdown', enableSound, { once:true });
   window.addEventListener('keydown',    enableSound, { once:true });
   window.addEventListener('touchstart', enableSound, { once:true });
+  window.addEventListener("keydown", (e) => {
+    if (e.repeat) return;
+    if (!(e.code === "Space" || e.key === " ")) return;
+    if (isTypingTarget(e.target)) return;
+    e.preventDefault();
+    triggerNowShortcut();
+  });
   // Compact mode first so layout is set before initial renders
   initCompact();
   initRightTabs();
