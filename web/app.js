@@ -7,6 +7,8 @@ const tabLiveBtn = document.getElementById("tabLiveBtn");
 const tabRvolBtn = document.getElementById("tabRvolBtn");
 const soundBtn = document.getElementById("soundBtn");
 const soundState = document.getElementById("soundState");
+const actionFlashEl = document.getElementById("actionFlash");
+const actionBadgeEl = document.getElementById("actionBadge");
 const chkEssentialsTop = document.getElementById("chkEssentialsTop");
 const chkEssentialsQqqTape = document.getElementById("chkEssentialsQqqTape");
 
@@ -605,6 +607,34 @@ function normalizeHHMM(raw) {
   if (h < 0 || h > 23 || m < 0 || m > 59) return "";
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+function feedbackClockET() {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    return `${fmt.format(new Date())} ET`;
+  } catch {
+    return "";
+  }
+}
+function showActionFeedback(label) {
+  const text = String(label || "APPLIED").trim().toUpperCase();
+  if (actionFlashEl) {
+    actionFlashEl.classList.remove("show");
+    void actionFlashEl.offsetWidth;
+    actionFlashEl.classList.add("show");
+  }
+  if (actionBadgeEl) {
+    actionBadgeEl.textContent = `${text} • ${feedbackClockET()}`;
+    actionBadgeEl.classList.remove("show");
+    void actionBadgeEl.offsetWidth;
+    actionBadgeEl.classList.add("show");
+  }
+}
 function isTypingTarget(target) {
   const el = target instanceof Element ? target : null;
   if (!el) return false;
@@ -617,7 +647,9 @@ function triggerNowShortcut() {
   const btn = document.getElementById("btnLiveNow") || document.querySelector(".localPreset[data-time='now']");
   if (btn && typeof btn.click === "function") {
     btn.click();
+    return;
   }
+  showActionFeedback("Now");
 }
 function nowHHMMET() {
   try {
@@ -2084,6 +2116,7 @@ function initEssentials(){
   }
   if (btnApplyLive) {
     btnApplyLive.addEventListener("click", async () => {
+      showActionFeedback("Apply Live");
       await applyLiveSettings({ resetTick: true });
       if (!streamRunning) {
         setStatus("Settings ready. Press Start to run.", true);
@@ -2118,6 +2151,9 @@ function initEssentials(){
       btn.addEventListener("click", async () => {
         const sess = (btn.dataset.session || "").trim();
         const rawTime = String(btn.dataset.time || "").trim().toLowerCase();
+        if (rawTime === "now") {
+          showActionFeedback("Now");
+        }
         let t = "";
         if (rawTime === "now") {
           t = nowHHMMET();

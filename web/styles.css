@@ -46,6 +46,52 @@ body{
   padding:10px 14px; background:#0f1016; border-bottom:1px solid #1c1f25;
 }
 .topRight{ display:flex; align-items:center; gap:10px; }
+.actionFlash{
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 9998;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(240, 228, 66, 0.62), rgba(240, 228, 66, 0) 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04));
+}
+.actionFlash.show{
+  animation: actionFlashPulse 360ms ease-out;
+}
+.actionBadge{
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translate(-50%, -8px);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 9999;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 235, 120, 0.9);
+  background: rgba(17, 25, 39, 0.92);
+  color: #fff8bf;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: .4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14) inset, 0 6px 22px rgba(0, 0, 0, 0.35);
+}
+.actionBadge.show{
+  animation: actionBadgePop 1150ms ease-out;
+}
+@keyframes actionFlashPulse {
+  0%   { opacity: 0; }
+  15%  { opacity: 0.80; }
+  55%  { opacity: 0.28; }
+  100% { opacity: 0; }
+}
+@keyframes actionBadgePop {
+  0%   { opacity: 0; transform: translate(-50%, -10px) scale(0.96); }
+  15%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  70%  { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -6px) scale(0.99); }
+}
 .essentialsToggle{
   display:inline-flex;
   align-items:center;
