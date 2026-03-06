@@ -7,8 +7,6 @@ const tabLiveBtn = document.getElementById("tabLiveBtn");
 const tabRvolBtn = document.getElementById("tabRvolBtn");
 const soundBtn = document.getElementById("soundBtn");
 const soundState = document.getElementById("soundState");
-const chkEssentialsTop = document.getElementById("chkEssentialsTop");
-const chkEssentialsTick = document.getElementById("chkEssentialsTick");
 const chkEssentialsQqqTape = document.getElementById("chkEssentialsQqqTape");
 
 // Separate fallbacks for up/down
@@ -46,7 +44,6 @@ const chkSyntheticSounds = document.getElementById("chkSyntheticSounds");
 const alertsTableBody = document.querySelector("#alertsTable tbody");
 const alertsCount = document.getElementById("alertsCount");
 // QQQ Tape panel
-const qqqTapeChartEl = document.getElementById("qqqTapeChart");
 const qqqTapeExecEl = document.getElementById("qqqTapeExec");
 const qqqTapeStateEl = document.getElementById("qqqTapeState");
 const qqqTapePriceEl = document.getElementById("qqqTapePrice");
@@ -61,7 +58,6 @@ const qqqTapeQuoteEl = document.getElementById("qqqTapeQuote");
 const qqqTapeMicroEl = document.getElementById("qqqTapeMicro");
 const qqqTapeTopEl = document.getElementById("qqqTapeTop");
 // Synthetic TICK panel
-const tickChartEl = document.getElementById("tickChart");
 const tickValueEl = document.getElementById("tickValue");
 const tickModeBadge = document.getElementById("tickModeBadge");
 // NEW: table head + sort state (per-minute sort)
@@ -96,21 +92,7 @@ let allAlerts = []; // [{kind, sym, name, sources, price, time, ts_unix}]
 let recentAlerts = []; // for RVOL [{time, symbol, price, volume, baseline, rvol, method}]
 let silent = false;
 let sessionDateET = ""; // YYYY-MM-DD (from /api/status)
-const QQQ_TAPE_HISTORY_LIMIT = 2400;
-const QQQ_TAPE_VISIBLE_BARS = 40;
-let qqqTapeChart = null;
-let qqqTapeSeries = null;
-let qqqTapeLineSeries = null;
-let qqqTapeRO = null;
-let qqqTapeData = []; // [{time, value, color}]
-const TICK_HISTORY_LIMIT = 2400;
-const TICK_VISIBLE_BARS = 20;
 const tickDirsBySymbol = new Map(); // sym -> -1 | 1
-let tickSeries = null;
-let tickLineSeries = null;
-let tickChart = null;
-let tickRO = null;
-let tickData = []; // [{time, value, color}]
 let tickCurrentValue = 0;
 let tickUniverseSize = 0; // total active watchlist symbols across all loaded watchlists
 const scalpAudio = document.createElement("audio");
@@ -753,13 +735,6 @@ function initRightTabs() {
   tabLiveBtn.addEventListener("click", () => setRightTab("live"));
   tabRvolBtn.addEventListener("click", () => setRightTab("rvol"));
 }
-function qqqTapeColor(value) {
-  if (value >= 1.50) return "#009E73";
-  if (value >= 0.50) return "#56B4E9";
-  if (value <= -1.50) return "#D55E00";
-  if (value <= -0.50) return "#E69F00";
-  return "#8d95a6";
-}
 function updateQQQTapeReadout(msg) {
   if (!qqqTapeExecEl) return;
   const execEdgeCents = Number(msg?.exec_edge_cents ?? msg?.edge_cents ?? 0);
@@ -811,130 +786,7 @@ function updateQQQTapeReadout(msg) {
     }
   }
 }
-function ensureQQQTapeChart() {
-  if (!qqqTapeChartEl || qqqTapeChart) return;
-  const LWC = (typeof window !== "undefined") ? window.LightweightCharts : null;
-  if (!LWC || typeof LWC.createChart !== "function") return;
-  const width = qqqTapeChartEl.clientWidth || 320;
-  const height = qqqTapeChartEl.clientHeight || 165;
-  qqqTapeChart = LWC.createChart(qqqTapeChartEl, {
-    width,
-    height,
-    layout: { background: { type: "solid", color: "#0f131d" }, textColor: "#d6dfef" },
-    grid: {
-      vertLines: { color: "rgba(155, 170, 195, 0.08)" },
-      horzLines: { color: "rgba(155, 170, 195, 0.12)" },
-    },
-    crosshair: { mode: 0 },
-    timeScale: {
-      borderVisible: false,
-      timeVisible: true,
-      secondsVisible: false,
-      rightOffset: 0.25,
-      barSpacing: 8,
-      minBarSpacing: 4,
-      fixRightEdge: true,
-      lockVisibleTimeRangeOnResize: true,
-    },
-    rightPriceScale: {
-      borderVisible: false,
-      autoScale: true,
-      scaleMargins: { top: 0.15, bottom: 0.15 },
-    },
-    localization: {
-      priceFormatter: (price) => {
-        const v = Number(price || 0);
-        return `${v > 0 ? "+" : ""}${v.toFixed(2)}`;
-      },
-    },
-  });
-  qqqTapeSeries = qqqTapeChart.addHistogramSeries({
-    base: 0,
-    color: "#8d95a6",
-    lastValueVisible: false,
-    priceLineVisible: false,
-    priceFormat: { type: "price", precision: 2, minMove: 0.01 },
-  });
-  qqqTapeLineSeries = qqqTapeChart.addLineSeries({
-    color: "#dbe6ff",
-    lineWidth: 2,
-    lineStyle: 0,
-    lastValueVisible: false,
-    priceLineVisible: false,
-    crosshairMarkerVisible: true,
-    crosshairMarkerRadius: 2,
-    crosshairMarkerBorderColor: "#dbe6ff",
-    crosshairMarkerBackgroundColor: "#0f131d",
-    priceFormat: { type: "price", precision: 2, minMove: 0.01 },
-  });
-  if (qqqTapeLineSeries && typeof qqqTapeLineSeries.createPriceLine === "function") {
-    qqqTapeLineSeries.createPriceLine({
-      price: 0,
-      color: "#b9c4dd",
-      lineWidth: 1,
-      lineStyle: 2,
-      axisLabelVisible: true,
-      title: "0",
-    });
-  }
-  if (qqqTapeRO) {
-    try { qqqTapeRO.disconnect(); } catch {}
-    qqqTapeRO = null;
-  }
-  if (typeof ResizeObserver === "function") {
-    qqqTapeRO = new ResizeObserver(() => {
-      if (!qqqTapeChart || !qqqTapeChartEl) return;
-      qqqTapeChart.applyOptions({
-        width: qqqTapeChartEl.clientWidth || 320,
-        height: qqqTapeChartEl.clientHeight || 165,
-      });
-    });
-    qqqTapeRO.observe(qqqTapeChartEl);
-  }
-}
-function updateQQQTapeScaleBounds() {
-  if (!qqqTapeSeries || !qqqTapeLineSeries) return;
-  const fixedRangeProvider = () => ({
-    priceRange: { minValue: -12, maxValue: 12 },
-  });
-  try {
-    qqqTapeSeries.applyOptions({ autoscaleInfoProvider: fixedRangeProvider });
-    qqqTapeLineSeries.applyOptions({ autoscaleInfoProvider: fixedRangeProvider });
-  } catch {}
-}
-function updateQQQTapeVisibleRange() {
-  if (!qqqTapeChart || qqqTapeData.length === 0) return;
-  const to = qqqTapeData.length - 1 + 0.25;
-  const from = to - Math.max(2, QQQ_TAPE_VISIBLE_BARS - 1);
-  try {
-    qqqTapeChart.timeScale().setVisibleLogicalRange({ from, to });
-  } catch {}
-}
-function drawQQQTapeSeries(fit = false) {
-  ensureQQQTapeChart();
-  if (!qqqTapeSeries) return;
-  qqqTapeSeries.setData(qqqTapeData);
-  if (qqqTapeLineSeries) {
-    qqqTapeLineSeries.setData(qqqTapeData.map(p => ({ time: p.time, value: p.value })));
-  }
-  updateQQQTapeScaleBounds();
-  updateQQQTapeVisibleRange();
-  if (qqqTapeChart) {
-    if (fit && qqqTapeData.length <= 2) {
-      qqqTapeChart.timeScale().fitContent();
-      updateQQQTapeVisibleRange();
-    } else {
-      qqqTapeChart.timeScale().scrollToRealTime();
-      updateQQQTapeVisibleRange();
-    }
-  }
-}
 function resetQQQTapeChart() {
-  const now = Math.floor(Date.now() / 1000);
-  qqqTapeData = [
-    { time: Math.max(1, now - 1), value: 0, color: qqqTapeColor(0) },
-    { time: Math.max(1, now), value: 0, color: qqqTapeColor(0) },
-  ];
   updateQQQTapeReadout({
     exec_edge_bps: 0,
     exec_edge_cents: 0,
@@ -950,31 +802,9 @@ function resetQQQTapeChart() {
     tradable: false,
     top: [],
   });
-  drawQQQTapeSeries(true);
-}
-function appendQQQTapePoint(msg, redraw = true) {
-  const rawTime = Number(msg?.ts_unix);
-  let pointTime = Number.isFinite(rawTime) && rawTime > 0
-    ? Math.floor(rawTime / 1000)
-    : Math.floor(Date.now() / 1000);
-  const n = qqqTapeData.length;
-  if (n > 0 && pointTime <= qqqTapeData[n - 1].time) {
-    pointTime = qqqTapeData[n - 1].time + 1;
-  }
-  const execEdgeBps = Number(msg?.exec_edge_bps ?? msg?.edge_bps ?? 0);
-  qqqTapeData.push({
-    time: pointTime,
-    value: execEdgeBps,
-    color: qqqTapeColor(execEdgeBps),
-  });
-  if (qqqTapeData.length > QQQ_TAPE_HISTORY_LIMIT) {
-    qqqTapeData = qqqTapeData.slice(qqqTapeData.length - QQQ_TAPE_HISTORY_LIMIT);
-  }
-  updateQQQTapeReadout(msg);
-  if (redraw) drawQQQTapeSeries(false);
 }
 function ingestQQQTape(msg, withSound = true) {
-  appendQQQTapePoint(msg, true);
+  updateQQQTapeReadout(msg);
   if (withSound) {
     maybePlaySyntheticTapeSound(msg);
   }
@@ -1001,13 +831,6 @@ function syncTickModeUI() {
   tickModeBadge.textContent = info.label;
   tickModeBadge.classList.toggle("local", info.badgeClass === "local");
 }
-function tickColor(value) {
-  const universe = Math.max(1, tickUniverseSize || tickDirsBySymbol.size || 1);
-  const ratio = value / universe;
-  if (value === 0) return "#8d95a6";
-  if (value > 0) return ratio >= 0.6 ? "#009E73" : "#56B4E9";
-  return ratio <= -0.6 ? "#D55E00" : "#E69F00";
-}
 function setTickUniverseSize(n) {
   const v = Number(n);
   if (Number.isFinite(v) && v > 0) {
@@ -1015,7 +838,6 @@ function setTickUniverseSize(n) {
   } else {
     tickUniverseSize = 0;
   }
-  updateTickScaleBounds();
 }
 async function refreshTickUniverseSize() {
   try {
@@ -1025,10 +847,6 @@ async function refreshTickUniverseSize() {
     setTickUniverseSize(syms.length);
   } catch {}
 }
-function tickYAxisBound() {
-  const v = Math.round(Number(tickUniverseSize) || 0);
-  return Math.max(1, v);
-}
 function updateTickReadout(value) {
   if (!tickValueEl) return;
   const v = Math.round(Number(value) || 0);
@@ -1036,135 +854,10 @@ function updateTickReadout(value) {
   tickValueEl.classList.remove("positive", "negative", "neutral");
   tickValueEl.classList.add(v > 0 ? "positive" : (v < 0 ? "negative" : "neutral"));
 }
-function ensureTickChart() {
-  if (!tickChartEl || tickChart) return;
-  const LWC = (typeof window !== "undefined") ? window.LightweightCharts : null;
-  if (!LWC || typeof LWC.createChart !== "function") return;
-  const width = tickChartEl.clientWidth || 320;
-  const height = tickChartEl.clientHeight || 165;
-  tickChart = LWC.createChart(tickChartEl, {
-    width,
-    height,
-    layout: { background: { type: "solid", color: "#0f131d" }, textColor: "#d6dfef" },
-    grid: {
-      vertLines: { color: "rgba(155, 170, 195, 0.08)" },
-      horzLines: { color: "rgba(155, 170, 195, 0.12)" },
-    },
-    crosshair: { mode: 0 },
-    timeScale: {
-      borderVisible: false,
-      timeVisible: true,
-      secondsVisible: false,
-      rightOffset: 0.25,
-      barSpacing: 8,
-      minBarSpacing: 4,
-      fixRightEdge: true,
-      lockVisibleTimeRangeOnResize: true,
-    },
-    rightPriceScale: {
-      borderVisible: false,
-      autoScale: true,
-      scaleMargins: { top: 0.15, bottom: 0.15 },
-    },
-    localization: {
-      priceFormatter: (price) => {
-        const v = Math.round(Number(price) || 0);
-        return `${v > 0 ? "+" : ""}${v}`;
-      },
-    },
-  });
-  tickSeries = tickChart.addHistogramSeries({
-    base: 0,
-    color: "#8d95a6",
-    lastValueVisible: false,
-    priceLineVisible: false,
-    priceFormat: { type: "price", precision: 0, minMove: 1 },
-  });
-  tickLineSeries = tickChart.addLineSeries({
-    color: "#dbe6ff",
-    lineWidth: 2,
-    lineStyle: 0,
-    lastValueVisible: false,
-    priceLineVisible: false,
-    crosshairMarkerVisible: true,
-    crosshairMarkerRadius: 2,
-    crosshairMarkerBorderColor: "#dbe6ff",
-    crosshairMarkerBackgroundColor: "#0f131d",
-    priceFormat: { type: "price", precision: 0, minMove: 1 },
-  });
-  if (tickLineSeries && typeof tickLineSeries.createPriceLine === "function") {
-    tickLineSeries.createPriceLine({
-      price: 0,
-      color: "#b9c4dd",
-      lineWidth: 1,
-      lineStyle: 2,
-      axisLabelVisible: true,
-      title: "0",
-    });
-  }
-  if (tickRO) {
-    try { tickRO.disconnect(); } catch {}
-    tickRO = null;
-  }
-  if (typeof ResizeObserver === "function") {
-    tickRO = new ResizeObserver(() => {
-      if (!tickChart || !tickChartEl) return;
-      tickChart.applyOptions({
-        width: tickChartEl.clientWidth || 320,
-        height: tickChartEl.clientHeight || 165,
-      });
-    });
-    tickRO.observe(tickChartEl);
-  }
-}
-function updateTickScaleBounds() {
-  if (!tickSeries || !tickLineSeries) return;
-  const bound = tickYAxisBound();
-  const fixedRangeProvider = () => ({
-    priceRange: { minValue: -bound, maxValue: bound },
-  });
-  try {
-    tickSeries.applyOptions({ autoscaleInfoProvider: fixedRangeProvider });
-    tickLineSeries.applyOptions({ autoscaleInfoProvider: fixedRangeProvider });
-  } catch {}
-}
-function updateTickVisibleRange() {
-  if (!tickChart || tickData.length === 0) return;
-  const to = tickData.length - 1 + 0.25;
-  const from = to - Math.max(2, TICK_VISIBLE_BARS - 1);
-  try {
-    tickChart.timeScale().setVisibleLogicalRange({ from, to });
-  } catch {}
-}
-function drawTickSeries(fit = false) {
-  ensureTickChart();
-  if (!tickSeries) return;
-  tickSeries.setData(tickData);
-  if (tickLineSeries) {
-    tickLineSeries.setData(tickData.map(p => ({ time: p.time, value: p.value })));
-  }
-  updateTickScaleBounds();
-  updateTickVisibleRange();
-  if (tickChart) {
-    if (fit && tickData.length <= 2) {
-      tickChart.timeScale().fitContent();
-      updateTickVisibleRange();
-    } else {
-      tickChart.timeScale().scrollToRealTime();
-      updateTickVisibleRange();
-    }
-  }
-}
 function resetTickChart() {
   tickDirsBySymbol.clear();
-  const now = Math.floor(Date.now() / 1000);
-  tickData = [
-    { time: Math.max(1, now - 1), value: 0, color: tickColor(0) },
-    { time: Math.max(1, now), value: 0, color: tickColor(0) },
-  ];
   tickCurrentValue = 0;
   updateTickReadout(0);
-  drawTickSeries(true);
 }
 function tickEpochSeconds(alertObj) {
   const ms = Number(alertObj?.ts_unix);
@@ -1187,25 +880,9 @@ function applyTickTransition(alertObj) {
   return { time: tickEpochSeconds(alertObj), value: tickCurrentValue };
 }
 function appendTickPoint(point, redraw = true) {
-  if (!point || !Number.isFinite(point.time)) return;
-  const n = tickData.length;
-  let pointTime = Math.max(1, Math.floor(point.time));
-  if (n > 0 && pointTime <= tickData[n - 1].time) {
-    // Keep each incoming alert as a visible bar, even when multiple alerts share a second.
-    pointTime = tickData[n - 1].time + 1;
-  }
-  const color = tickColor(point.value);
-  const normalized = {
-    time: pointTime,
-    value: Math.round(Number(point.value) || 0),
-    color,
-  };
-  tickData.push(normalized);
-  if (tickData.length > TICK_HISTORY_LIMIT) {
-    tickData = tickData.slice(tickData.length - TICK_HISTORY_LIMIT);
-  }
-  updateTickReadout(normalized.value);
-  if (redraw) drawTickSeries(false);
+  if (!point) return;
+  tickCurrentValue = Math.round(Number(point.value) || 0);
+  updateTickReadout(tickCurrentValue);
 }
 function ingestTickAlert(alertObj, redraw = true) {
   const point = applyTickTransition(alertObj);
@@ -1214,7 +891,6 @@ function ingestTickAlert(alertObj, redraw = true) {
 }
 function rebuildTickFromAlerts(alerts) {
   tickDirsBySymbol.clear();
-  tickData = [];
   tickCurrentValue = 0;
   if (qqqModeEnabled) {
     resetTickChart();
@@ -1225,21 +901,7 @@ function rebuildTickFromAlerts(alerts) {
   for (const a of ordered) {
     ingestTickAlert(a, false);
   }
-  if (tickData.length === 0) {
-    const now = Math.floor(Date.now() / 1000);
-    tickData = [
-      { time: Math.max(1, now - 1), value: 0, color: tickColor(0) },
-      { time: Math.max(1, now), value: 0, color: tickColor(0) },
-    ];
-  } else if (tickData.length === 1) {
-    const first = tickData[0];
-    tickData.unshift({
-      time: Math.max(1, Number(first.time || 1) - 1),
-      value: 0,
-      color: tickColor(0),
-    });
-  }
-  drawTickSeries(true);
+  updateTickReadout(tickCurrentValue);
 }
 function resetTickForContextChange() {
   syncTickModeUI();
@@ -2238,8 +1900,6 @@ function initCompact(){
 function setEssentials(on){
   const enabled = !!on;
   document.body.classList.toggle("essentials", enabled);
-  if (chkEssentialsTop) chkEssentialsTop.checked = enabled;
-  if (chkEssentialsTick) chkEssentialsTick.checked = enabled;
   if (chkEssentialsQqqTape) chkEssentialsQqqTape.checked = enabled;
   if (enabled) setRightTab("live");
   try { localStorage.setItem(ESSENTIALS_STORAGE_KEY, enabled ? "1" : "0"); } catch {}
@@ -2274,22 +1934,10 @@ function initEssentials(){
   initRightTabs();
   initEssentials();
   syncTickModeUI();
-  ensureQQQTapeChart();
   resetQQQTapeChart();
-  ensureTickChart();
   resetTickChart();
   if (chkCompact) {
     chkCompact.addEventListener('change', (e) => setCompact(!!e.target.checked));
-  }
-  if (chkEssentialsTop) {
-    chkEssentialsTop.addEventListener("change", (e) => {
-      setEssentials(!!e.target.checked);
-    });
-  }
-  if (chkEssentialsTick) {
-    chkEssentialsTick.addEventListener("change", (e) => {
-      setEssentials(!!e.target.checked);
-    });
   }
   if (chkEssentialsQqqTape) {
     chkEssentialsQqqTape.addEventListener("change", (e) => {

@@ -12,10 +12,6 @@
   <header class="topbar">
     <div class="brand">qqq-edge</div>
     <div class="topRight">
-      <label class="essentialsToggle topEssentials" title="Show only Synthetic TICK + Live Alerts">
-        <input id="chkEssentialsTop" type="checkbox"/>
-        <span>Essentials</span>
-      </label>
       <button id="soundBtn" class="primary">Enable sound</button>
       <span id="soundState" class="muted">Sound ON</span>
       <div id="status" class="pill">Disconnected</div>
@@ -190,17 +186,10 @@
             <span>Quote <strong id="qqqTapeQuote">0.000</strong></span>
             <span>Micro <strong id="qqqTapeMicro">0.000</strong></span>
           </div>
-          <div id="qqqTapeChart" class="tickChart"></div>
           <div id="qqqTapeTop" class="tapeTopLeaders"></div>
         </section>
 
         <section id="tickPanel" class="panel tickPanel" aria-label="Breakout breadth">
-          <div class="essentialsInline">
-            <label class="essentialsToggle tickEssentials" title="Exit essentials mode">
-              <input id="chkEssentialsTick" type="checkbox"/>
-              <span>Essentials Mode</span>
-            </label>
-          </div>
           <div class="tickTop">
             <div>
               <div class="title">Breakout Breadth</div>
@@ -211,7 +200,6 @@
               <span id="tickValue" class="tickValue neutral">0</span>
             </div>
           </div>
-          <div id="tickChart" class="tickChart"></div>
           <div class="tickScaleHint">
             <span class="tickLegendPos">More upside breakouts</span>
             <span class="tickLegendZero">0 = balanced</span>

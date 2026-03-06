@@ -72,9 +72,6 @@ body{
   display:none;
   margin-bottom:10px;
 }
-body.essentials .topEssentials{
-  display:none;
-}
 body.essentials .essentialsInline{
   display:flex;
 }
@@ -178,13 +175,6 @@ body.essentials .topbar{
 .tickValue.positive{ color:var(--tick-pos-strong); }
 .tickValue.negative{ color:var(--tick-neg-strong); }
 .tickValue.neutral{ color:var(--tick-neutral); }
-.tickChart{
-  width:100%;
-  height:165px;
-  border:1px solid #202534;
-  border-radius:8px;
-  background:linear-gradient(180deg, #101622 0%, #0f131d 100%);
-}
 .tapeMeta{
   display:flex;
   flex-wrap:wrap;
@@ -357,9 +347,6 @@ body.qqqMode .qqqHide{
 }
 body.qqqMode #qqqTapePanel{
   margin: 0;
-}
-body.qqqMode #qqqTapePanel .tickChart{
-  height: 220px;
 }
 .rightTabs{ display:flex; flex-direction:column; gap:10px; }
 .tabHeader{
@@ -659,7 +646,6 @@ body.qqqMode #qqqTapePanel .tickChart{
   .liveNowBtn{ min-width:84px; padding:10px 16px; }
   .tickTop{ flex-direction:column; }
   .tickReadout{ width:100%; justify-content:space-between; }
-  .tickChart{ height:145px; }
   .tapeMeta{ gap:6px 10px; }
 }
 /* ===========================
