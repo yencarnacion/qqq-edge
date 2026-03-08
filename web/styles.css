@@ -483,17 +483,20 @@ body.qqqMode #qqqTapePanel{
   box-shadow:0 0 0 1px rgba(138, 201, 255, 0.42), 0 0 22px rgba(35, 102, 170, 0.34);
 }
 .liveAutoBtn.isActive{
-  background:#c96f1a;
-  border-color:#f2b36f;
-  color:#fff8ef;
-  box-shadow:0 0 0 1px rgba(242, 179, 111, 0.24), 0 10px 24px rgba(201, 111, 26, 0.28);
+  background:#8b5f34;
+  border-color:#ba8a58;
+  color:#f3e7d8;
+  box-shadow:0 0 0 1px rgba(186, 138, 88, 0.16), 0 8px 18px rgba(70, 45, 20, 0.18);
+}
+.liveAutoBtn.isActive .liveAutoCountdown{
+  background:rgba(34, 20, 8, 0.22);
 }
 .liveAutoBtn.isActive:hover,
 .liveAutoBtn.isActive:focus-visible{
-  background:#a95112;
-  border-color:#ffc488;
-  color:#fff4e8;
-  box-shadow:0 0 0 1px rgba(255, 196, 136, 0.42), 0 0 22px rgba(169, 81, 18, 0.34);
+  background:#72481f;
+  border-color:#cca071;
+  color:#f1e3d3;
+  box-shadow:0 0 0 1px rgba(204, 160, 113, 0.24), 0 0 16px rgba(114, 72, 31, 0.20);
 }
 .liveAutoBtn:active{
   transform:translateY(1px);
