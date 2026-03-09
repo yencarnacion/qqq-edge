@@ -101,6 +101,7 @@ let recentAlerts = []; // for RVOL [{time, symbol, price, volume, baseline, rvol
 let silent = false;
 let sessionDateET = ""; // YYYY-MM-DD (from /api/status)
 const tickDirsBySymbol = new Map(); // sym -> -1 | 1
+const tapePaceDirsBySymbol = new Map(); // sym -> -1 | 1 for pace-impact detection
 let tickCurrentValue = 0;
 let tickUniverseSize = 0; // total active watchlist symbols across all loaded watchlists
 const scalpAudio = document.createElement("audio");
@@ -664,6 +665,34 @@ function tapePaceWindowMs() {
 function isTapePaceKind(kind) {
   return kind === "hod" || kind === "lod" || kind === "lhigh" || kind === "llow";
 }
+function breakoutDirectionForAlert(alertObj, mode = selectedLevelsMode()) {
+  const kind = String(alertObj?.kind || "").toLowerCase();
+  const sym = String(alertObj?.sym || "").trim().toUpperCase();
+  if (!sym || !kind) return null;
+  const info = tickModeInfo(mode);
+  const dir = kind === info.upKind ? 1 : (kind === info.downKind ? -1 : 0);
+  if (!dir) return null;
+  return { sym, dir };
+}
+function applyBreakoutTransition(alertObj, dirsBySymbol, mode = selectedLevelsMode()) {
+  const breakout = breakoutDirectionForAlert(alertObj, mode);
+  if (!breakout) return null;
+  const prevDir = dirsBySymbol.get(breakout.sym) || 0;
+  if (prevDir === breakout.dir) return null;
+  dirsBySymbol.set(breakout.sym, breakout.dir);
+  return {
+    sym: breakout.sym,
+    prevDir,
+    nextDir: breakout.dir,
+    delta: breakout.dir - prevDir,
+    time: tickEpochSeconds(alertObj),
+  };
+}
+function tapePaceEventTimeMs(alertObj) {
+  const tsMs = Number(alertObj?.ts_unix);
+  if (Number.isFinite(tsMs) && tsMs > 0) return tsMs;
+  return Date.now();
+}
 function pruneTapePaceEvents(nowMs = Date.now()) {
   const cutoff = nowMs - tapePaceWindowMs();
   tapePaceEventsMs = tapePaceEventsMs.filter(tsMs => tsMs >= cutoff);
@@ -682,23 +711,29 @@ function refreshTapePaceIndicator(nowMs = Date.now()) {
   const windowSeconds = Math.max(1, Number(uiConfig.paceOfTapeWindowSeconds) || 60);
   const count = tapePaceEventsMs.length;
   const state = tapePaceState(count, windowSeconds);
+  const info = tickModeInfo();
+  const modeLabel = info.label;
   tapePaceIndicator.dataset.state = state;
   tapePaceCountEl.textContent = String(count);
   tapePaceWindowEl.textContent = `${windowSeconds}s`;
-  const title = `${count} HOD, LOD, Local High, or Local Low alerts in the last ${windowSeconds} seconds`;
+  const title = `${count} ${modeLabel} alerts changed breakout breadth in the last ${windowSeconds} seconds`;
   tapePaceIndicator.title = title;
   tapePaceIndicator.setAttribute("aria-label", `Pace of tape ${state}: ${title}`);
 }
 function rebuildTapePaceEvents(alerts) {
   tapePaceEventsMs = [];
+  tapePaceDirsBySymbol.clear();
   const items = Array.isArray(alerts) ? alerts : [];
   const nowMs = Date.now();
   const windowMs = tapePaceWindowMs();
-  for (const alertObj of items) {
+  const mode = selectedLevelsMode();
+  const ordered = items.slice().sort((a, b) => Number(a?.ts_unix || 0) - Number(b?.ts_unix || 0));
+  for (const alertObj of ordered) {
     if (!isTapePaceKind(alertObj?.kind)) continue;
-    const tsMs = Number(alertObj?.ts_unix);
-    if (!Number.isFinite(tsMs) || tsMs <= 0) continue;
-    if (nowMs-tsMs > windowMs || tsMs > nowMs) continue;
+    const transition = applyBreakoutTransition(alertObj, tapePaceDirsBySymbol, mode);
+    if (!transition) continue;
+    const tsMs = tapePaceEventTimeMs(alertObj);
+    if (nowMs - tsMs > windowMs || tsMs > nowMs) continue;
     tapePaceEventsMs.push(tsMs);
   }
   tapePaceEventsMs.sort((a, b) => a - b);
@@ -706,7 +741,9 @@ function rebuildTapePaceEvents(alerts) {
 }
 function recordTapePaceEvent(alertObj) {
   if (!isTapePaceKind(alertObj?.kind)) return;
-  tapePaceEventsMs.push(Date.now());
+  const transition = applyBreakoutTransition(alertObj, tapePaceDirsBySymbol);
+  if (!transition) return;
+  tapePaceEventsMs.push(tapePaceEventTimeMs(alertObj));
   refreshTapePaceIndicator();
 }
 function formatAutoCountdown(msRemaining) {
@@ -1067,19 +1104,10 @@ function tickEpochSeconds(alertObj) {
   return Math.floor(Date.now() / 1000);
 }
 function applyTickTransition(alertObj) {
-  const kind = String(alertObj?.kind || "").toLowerCase();
-  const sym = String(alertObj?.sym || "").trim().toUpperCase();
-  if (!sym || !kind) return null;
-  const info = tickModeInfo();
-  const nextDir = kind === info.upKind ? 1 : (kind === info.downKind ? -1 : 0);
-  if (!nextDir) return null;
-
-  const prevDir = tickDirsBySymbol.get(sym) || 0;
-  if (prevDir === nextDir) return null;
-
-  tickDirsBySymbol.set(sym, nextDir);
-  tickCurrentValue += (nextDir - prevDir);
-  return { time: tickEpochSeconds(alertObj), value: tickCurrentValue };
+  const transition = applyBreakoutTransition(alertObj, tickDirsBySymbol);
+  if (!transition) return null;
+  tickCurrentValue += transition.delta;
+  return { time: transition.time, value: tickCurrentValue };
 }
 function appendTickPoint(point, redraw = true) {
   if (!point) return;
@@ -2202,6 +2230,7 @@ function initEssentials(){
     chartsById.clear();
     allAlerts = [];
     tapePaceEventsMs = [];
+    tapePaceDirsBySymbol.clear();
     historyLoaded = false;
     recentAlerts = []; // NEW
     renderRecentAlerts(); // NEW
@@ -2236,6 +2265,7 @@ function initEssentials(){
     chartsById.clear();
     allAlerts = [];
     tapePaceEventsMs = [];
+    tapePaceDirsBySymbol.clear();
     historyLoaded = false;
     recentAlerts = []; // NEW
     renderRecentAlerts(); // NEW
@@ -2266,6 +2296,7 @@ function initEssentials(){
   levelsModeRadios.forEach(el => {
     el.addEventListener("change", async () => {
       syncLevelsModeUI();
+      if (historyLoaded) rebuildTapePaceEvents(allAlerts);
       await applyLiveSettings({ resetTick: true });
     });
   });
