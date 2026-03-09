@@ -32,6 +32,9 @@ const localTimeInput = document.getElementById("localTimeInput");
 const btnLiveAuto = document.getElementById("btnLiveAuto");
 const liveAutoCountdown = document.getElementById("liveAutoCountdown");
 const liveNowTime = document.getElementById("liveNowTime");
+const tapePaceIndicator = document.getElementById("tapePaceIndicator");
+const tapePaceCountEl = document.getElementById("tapePaceCount");
+const tapePaceWindowEl = document.getElementById("tapePaceWindow");
 const levelsModeRadios = document.querySelectorAll('input[name="levelsMode"]');
 const sessionQuickBtns = document.querySelectorAll(".sessionQuick");
 const localPresetBtns = document.querySelectorAll(".localPreset");
@@ -116,6 +119,8 @@ const metaFetchQueue = [];
 let autoNowEnabled = false;
 let autoNowTimerId = 0;
 let autoNowNextAt = 0;
+let tapePaceTimerId = 0;
+let tapePaceEventsMs = [];
 
 function setBoundedCache(map, key, value, maxSize) {
   map.set(key, value);
@@ -173,7 +178,8 @@ let uiConfig = {
   tinyCapMax: 10_000_000,           // $10M
   industryRegex: "(medical|bio)",   // case-insensitive at runtime
   chartOpenerBaseURL: "http://localhost:8081",
-  autoNowSeconds: 10
+  autoNowSeconds: 10,
+  paceOfTapeWindowSeconds: 60
 };
 let industryRe = null;
 function compileIndustryRegex(){
@@ -651,6 +657,56 @@ function isTypingTarget(target) {
 }
 function autoNowIntervalMs() {
   return Math.max(1, Number(uiConfig.autoNowSeconds) || 10) * 1000;
+}
+function tapePaceWindowMs() {
+  return Math.max(1, Number(uiConfig.paceOfTapeWindowSeconds) || 60) * 1000;
+}
+function isTapePaceKind(kind) {
+  return kind === "hod" || kind === "lod" || kind === "lhigh" || kind === "llow";
+}
+function pruneTapePaceEvents(nowMs = Date.now()) {
+  const cutoff = nowMs - tapePaceWindowMs();
+  tapePaceEventsMs = tapePaceEventsMs.filter(tsMs => tsMs >= cutoff);
+}
+function tapePaceState(count, windowSeconds) {
+  const ratePerMinute = count * (60 / Math.max(1, windowSeconds));
+  if (count <= 0) return "idle";
+  if (ratePerMinute < 4) return "slow";
+  if (ratePerMinute < 8) return "active";
+  if (ratePerMinute < 14) return "fast";
+  return "hot";
+}
+function refreshTapePaceIndicator(nowMs = Date.now()) {
+  if (!tapePaceIndicator || !tapePaceCountEl || !tapePaceWindowEl) return;
+  pruneTapePaceEvents(nowMs);
+  const windowSeconds = Math.max(1, Number(uiConfig.paceOfTapeWindowSeconds) || 60);
+  const count = tapePaceEventsMs.length;
+  const state = tapePaceState(count, windowSeconds);
+  tapePaceIndicator.dataset.state = state;
+  tapePaceCountEl.textContent = String(count);
+  tapePaceWindowEl.textContent = `${windowSeconds}s`;
+  const title = `${count} HOD, LOD, Local High, or Local Low alerts in the last ${windowSeconds} seconds`;
+  tapePaceIndicator.title = title;
+  tapePaceIndicator.setAttribute("aria-label", `Pace of tape ${state}: ${title}`);
+}
+function rebuildTapePaceEvents(alerts) {
+  tapePaceEventsMs = [];
+  const items = Array.isArray(alerts) ? alerts : [];
+  for (const alertObj of items) {
+    if (!isTapePaceKind(alertObj?.kind)) continue;
+    const tsMs = Number(alertObj?.ts_unix);
+    if (!Number.isFinite(tsMs) || tsMs <= 0) continue;
+    tapePaceEventsMs.push(tsMs);
+  }
+  tapePaceEventsMs.sort((a, b) => a - b);
+  refreshTapePaceIndicator();
+}
+function recordTapePaceEvent(alertObj) {
+  if (!isTapePaceKind(alertObj?.kind)) return;
+  const tsMs = Number(alertObj?.ts_unix);
+  if (!Number.isFinite(tsMs) || tsMs <= 0) return;
+  tapePaceEventsMs.push(tsMs);
+  refreshTapePaceIndicator();
 }
 function formatAutoCountdown(msRemaining) {
   return `${Math.max(0, Math.ceil(msRemaining / 1000))}s`;
@@ -1383,6 +1439,7 @@ function renderAll(){
   recomputeFeedCapacity();
   recomputeLiveCapacity();
   seedLiveFromHistory();
+  refreshTapePaceIndicator();
 }
 function applyQQQMode(enabled) {
   qqqModeEnabled = !!enabled;
@@ -1402,6 +1459,7 @@ function applyQQQMode(enabled) {
 }
 function addIncomingAlert(a){
   allAlerts.push(a);
+  recordTapePaceEvent(a);
   // Prevent infinite memory growth in array
   if (allAlerts.length > HISTORY_LIMIT) {
     allAlerts.shift();
@@ -1882,6 +1940,7 @@ function connectWS() {
       if (msg.type === "history") {
         historyLoaded = true;
         allAlerts = msg.alerts.slice(); // oldest -> newest
+        rebuildTapePaceEvents(allAlerts);
         renderAll();
         rebuildTickFromAlerts(allAlerts);
         return;
@@ -2015,8 +2074,12 @@ async function initStatus() {
       if (typeof j.ui.auto_now_seconds === "number" && isFinite(j.ui.auto_now_seconds) && j.ui.auto_now_seconds > 0) {
         uiConfig.autoNowSeconds = Math.max(1, Math.round(j.ui.auto_now_seconds));
       }
+      if (typeof j.ui.pace_of_tape_window_seconds === "number" && isFinite(j.ui.pace_of_tape_window_seconds) && j.ui.pace_of_tape_window_seconds > 0) {
+        uiConfig.paceOfTapeWindowSeconds = Math.max(1, Math.round(j.ui.pace_of_tape_window_seconds));
+      }
       compileIndustryRegex();
       syncAutoNowButton();
+      refreshTapePaceIndicator();
     }
     applyQQQMode(!!j?.qqq_mode);
   } catch {
@@ -2091,6 +2154,10 @@ function initEssentials(){
   initRightTabs();
   initEssentials();
   syncAutoNowButton();
+  refreshTapePaceIndicator();
+  tapePaceTimerId = window.setInterval(() => {
+    refreshTapePaceIndicator();
+  }, 250);
   syncTickModeUI();
   resetQQQTapeChart();
   resetTickChart();
@@ -2133,6 +2200,7 @@ function initEssentials(){
     activeChartQueue.splice(0, activeChartQueue.length);
     chartsById.clear();
     allAlerts = [];
+    tapePaceEventsMs = [];
     historyLoaded = false;
     recentAlerts = []; // NEW
     renderRecentAlerts(); // NEW
@@ -2166,6 +2234,7 @@ function initEssentials(){
     activeChartQueue.splice(0, activeChartQueue.length);
     chartsById.clear();
     allAlerts = [];
+    tapePaceEventsMs = [];
     historyLoaded = false;
     recentAlerts = []; // NEW
     renderRecentAlerts(); // NEW

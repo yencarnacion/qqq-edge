@@ -217,6 +217,17 @@
               <button id="tabRvolBtn" type="button" class="tabBtn" role="tab" aria-controls="alertsWrap" aria-selected="false">RVOL Table</button>
             </div>
             <div class="liveNowCluster">
+              <div
+                id="tapePaceIndicator"
+                class="tapePaceIndicator"
+                data-state="idle"
+                title="Counts HOD/LOD and Local High/Low alerts in the rolling pace-of-tape window"
+                aria-label="Pace of tape: 0 HOD, LOD, Local High, or Local Low alerts in the last 60 seconds"
+              >
+                <span class="tapePaceLabel">Pace</span>
+                <span id="tapePaceWindow" class="tapePaceWindow">60s</span>
+                <span id="tapePaceCount" class="tapePaceCount">0</span>
+              </div>
               <button
                 id="btnLiveAuto"
                 type="button"

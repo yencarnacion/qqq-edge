@@ -62,9 +62,10 @@ type AppConfig struct {
 		StateFile string `yaml:"state_file"`
 	} `yaml:"persistence"`
 	UI struct {
-		ChartOpenerBaseURL string `yaml:"chart_opener_base_url"` // default "http://localhost:8081"
-		AutoNowSeconds     int    `yaml:"auto_now_seconds"`      // default 10
-		LiveColors         struct {
+		ChartOpenerBaseURL      string `yaml:"chart_opener_base_url"`       // default "http://localhost:8081"
+		AutoNowSeconds          int    `yaml:"auto_now_seconds"`            // default 10
+		PaceOfTapeWindowSeconds int    `yaml:"pace_of_tape_window_seconds"` // default 60
+		LiveColors              struct {
 			TinyCapMax    float64 `yaml:"tiny_cap_max"`   // dollars; default 10_000_000
 			IndustryRegex string  `yaml:"industry_regex"` // default "(medical|bio)"
 		} `yaml:"live_colors"`
@@ -1688,6 +1689,9 @@ func main() {
 	if cfg.UI.AutoNowSeconds <= 0 {
 		cfg.UI.AutoNowSeconds = 10
 	}
+	if cfg.UI.PaceOfTapeWindowSeconds <= 0 {
+		cfg.UI.PaceOfTapeWindowSeconds = 60
+	}
 
 	watchlistFiles := []string{"watchlist.yaml"}
 	if strings.TrimSpace(*watchlistsRaw) != "" {
@@ -2280,10 +2284,11 @@ func main() {
 			},
 			QQQTape: qqqTape.Snapshot(),
 			UI: map[string]any{
-				"tiny_cap_max":          cfg.UI.LiveColors.TinyCapMax,
-				"industry_regex":        cfg.UI.LiveColors.IndustryRegex,
-				"chart_opener_base_url": cfg.UI.ChartOpenerBaseURL,
-				"auto_now_seconds":      cfg.UI.AutoNowSeconds,
+				"tiny_cap_max":                cfg.UI.LiveColors.TinyCapMax,
+				"industry_regex":              cfg.UI.LiveColors.IndustryRegex,
+				"chart_opener_base_url":       cfg.UI.ChartOpenerBaseURL,
+				"auto_now_seconds":            cfg.UI.AutoNowSeconds,
+				"pace_of_tape_window_seconds": cfg.UI.PaceOfTapeWindowSeconds,
 			},
 		}
 		rvm.mu.RLock()
