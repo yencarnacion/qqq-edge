@@ -29,6 +29,7 @@ const chkLocalLow = document.getElementById("chkLocalLow");
 const chkCompact = document.getElementById("chkCompact"); // NEW
 const chkScalps = document.getElementById("chkScalps");
 const localTimeInput = document.getElementById("localTimeInput");
+const localTimeReadout = document.getElementById("localTimeReadout");
 const btnLiveAuto = document.getElementById("btnLiveAuto");
 const liveAutoCountdown = document.getElementById("liveAutoCountdown");
 const liveNowTime = document.getElementById("liveNowTime");
@@ -120,6 +121,7 @@ const metaFetchQueue = [];
 let autoNowEnabled = false;
 let autoNowTimerId = 0;
 let autoNowNextAt = 0;
+let etClockTimerId = 0;
 let tapePaceTimerId = 0;
 let tapePaceEventsMs = [];
 let autoNowLastEnabled = null;
@@ -627,6 +629,42 @@ function normalizeHHMM(raw) {
   if (h < 0 || h > 23 || m < 0 || m > 59) return "";
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+function formatHHMMSS(raw) {
+  const normalized = normalizeHHMM(raw);
+  if (!normalized) return "";
+  return `${normalized}:00`;
+}
+function currentETClockHHMMSS(at = new Date()) {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    return fmt.format(at);
+  } catch {
+    return "";
+  }
+}
+function syncETClockReadouts(at = new Date()) {
+  const text = currentETClockHHMMSS(at) || "09:30:00";
+  if (liveNowTime && liveNowTime.textContent !== text) {
+    liveNowTime.textContent = text;
+  }
+}
+function scheduleETClockTick(nowMs = Date.now()) {
+  if (etClockTimerId) {
+    window.clearTimeout(etClockTimerId);
+    etClockTimerId = 0;
+  }
+  const delayMs = Math.max(50, 1000 - (nowMs % 1000));
+  etClockTimerId = window.setTimeout(() => {
+    syncETClockReadouts();
+    scheduleETClockTick();
+  }, delayMs);
+}
 function feedbackClockET() {
   try {
     const fmt = new Intl.DateTimeFormat("en-US", {
@@ -665,6 +703,22 @@ function isTypingTarget(target) {
 }
 function autoNowIntervalMs() {
   return Math.max(1, Number(uiConfig.autoNowSeconds) || 10) * 1000;
+}
+function autoNowIntervalSeconds() {
+  return Math.max(1, Number(uiConfig.autoNowSeconds) || 10);
+}
+function nextAutoNowBoundaryMs(nowMs = Date.now(), opts = {}) {
+  const inclusive = !!opts.inclusive;
+  const intervalSeconds = autoNowIntervalSeconds();
+  const truncatedNowMs = Math.floor(nowMs / 1000) * 1000;
+  const now = new Date(truncatedNowMs);
+  const seconds = now.getSeconds();
+  const minuteStartMs = truncatedNowMs - (seconds * 1000);
+  if (inclusive && (seconds % intervalSeconds) === 0) {
+    return nowMs;
+  }
+  const nextSecond = Math.floor(seconds / intervalSeconds + 1) * intervalSeconds;
+  return minuteStartMs + (nextSecond * 1000);
 }
 function tapePaceWindowMs() {
   return Math.max(1, Number(uiConfig.paceOfTapeWindowSeconds) || 60) * 1000;
@@ -838,7 +892,7 @@ function syncAutoNowButton(nowMs = Date.now()) {
 }
 function resetAutoNowCountdown() {
   if (!autoNowEnabled) return;
-  autoNowNextAt = Date.now() + autoNowIntervalMs();
+  autoNowNextAt = nextAutoNowBoundaryMs(Date.now());
   syncAutoNowButton();
   scheduleAutoNowTick();
 }
@@ -855,7 +909,7 @@ function tickAutoNow() {
   if (!autoNowEnabled) return;
   const now = Date.now();
   if (now >= autoNowNextAt) {
-    autoNowNextAt = now + autoNowIntervalMs();
+    autoNowNextAt = nextAutoNowBoundaryMs(now);
     syncAutoNowButton(now);
     scheduleAutoNowTick(now);
     void triggerNowShortcut({ resetAutoCountdown: false });
@@ -866,7 +920,7 @@ function tickAutoNow() {
 }
 function startAutoNow() {
   autoNowEnabled = true;
-  autoNowNextAt = Date.now() + autoNowIntervalMs();
+  autoNowNextAt = nextAutoNowBoundaryMs(Date.now(), { inclusive: true });
   syncAutoNowButton();
   scheduleAutoNowTick();
 }
@@ -947,9 +1001,9 @@ function hourStartET() {
   return `${String(p.h).padStart(2, "0")}:00`;
 }
 function syncLocalTimeMirror(raw) {
-  if (!liveNowTime) return;
   const normalized = normalizeHHMM(raw || localTimeInput?.value || "");
-  liveNowTime.textContent = normalized || "09:30";
+  if (!localTimeReadout) return;
+  localTimeReadout.textContent = formatHHMMSS(normalized || "09:30") || "09:30:00";
 }
 function currentLocalTimeInput() {
   const session = selectedSession();
@@ -2254,10 +2308,14 @@ function initEssentials(){
   initCompact();
   initRightTabs();
   initEssentials();
+  syncETClockReadouts();
+  scheduleETClockTick();
   syncAutoNowButton();
   refreshTapePaceIndicator();
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;
+    syncETClockReadouts();
+    scheduleETClockTick();
     if (autoNowEnabled) tickAutoNow();
     else syncAutoNowButton();
     refreshTapePaceIndicator();

@@ -63,6 +63,7 @@
         <label for="localTimeInput">Local Anchor Time (ET)</label>
         <div class="anchor-input-row">
           <input id="localTimeInput" type="time" step="60" value="09:30" />
+          <span id="localTimeReadout" class="localTimeReadout" aria-label="Local Anchor Time readout">09:30:00</span>
           <button id="btnApplyLive" type="button" class="primary">Apply Live</button>
         </div>
         <div class="quick-row">
@@ -238,7 +239,7 @@
                 <span class="liveAutoLabel">Auto</span>
                 <span id="liveAutoCountdown" class="liveAutoCountdown" hidden>10s</span>
               </button>
-              <span id="liveNowTime" class="liveNowTime" aria-label="Local Anchor Time duplicate">09:30</span>
+              <span id="liveNowTime" class="liveNowTime" aria-label="Current ET time">09:30:00</span>
               <button
                 id="btnLiveNow"
                 type="button"

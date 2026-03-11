@@ -316,6 +316,20 @@ body.essentials .topbar{
   align-items:center;
 }
 .anchor-input-row input{ min-width: 120px; }
+.localTimeReadout{
+  min-width:90px;
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid #313748;
+  background:#0f1016;
+  color:#dbe7ff;
+  font-size:14px;
+  font-weight:800;
+  font-variant-numeric:tabular-nums;
+  text-align:center;
+  letter-spacing:.3px;
+  user-select:none;
+}
 .quick-row{
   display:flex;
   gap:8px;
@@ -535,7 +549,7 @@ body.qqqMode #qqqTapePanel{
   transition:background-color .12s ease, border-color .12s ease, box-shadow .12s ease, transform .06s ease;
 }
 .liveNowTime{
-  min-width:72px;
+  min-width:90px;
   padding:11px 12px;
   border-radius:10px;
   border:1px solid #313748;
@@ -821,7 +835,7 @@ body.qqqMode #qqqTapePanel{
   .tapePaceWindow{ font-size:15px; }
   .tapePaceCount{ font-size:30px; }
   .liveAutoBtn{ min-width:96px; padding:10px 12px; font-size:14px; }
-  .liveNowTime{ min-width:66px; padding:10px 10px; font-size:15px; }
+  .liveNowTime{ min-width:90px; padding:10px 10px; font-size:15px; }
   .liveNowBtn{ min-width:84px; padding:10px 16px; }
   .tickTop{ flex-direction:column; }
   .tickReadout{ width:100%; justify-content:space-between; }
